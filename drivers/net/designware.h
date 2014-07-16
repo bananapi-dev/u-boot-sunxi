@@ -230,6 +230,15 @@ struct dw_eth_dev {
 	struct eth_device *dev;
 	struct phy_device *phydev;
 	struct mii_dev *bus;
+
+#ifdef CONFIG_BANANAPI
+    u32 gpio_power_hd;
+#endif
 };
 
+#ifdef CONFIG_BANANAPI
+    void gmac_phy_power_en(struct dw_eth_dev *priv);
+    void gmac_phy_power_disable(struct dw_eth_dev *priv);
+    void gmac_set_macaddr(struct eth_device *dev);
+#endif
 #endif

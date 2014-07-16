@@ -16,6 +16,9 @@
 #include <linux/err.h>
 #include <asm/io.h>
 #include "designware.h"
+#ifdef CONFIG_BANANAPI
+    #include <asm/gpio.h>
+#endif
 
 #if !defined(CONFIG_PHYLIB)
 # error "DesignWare Ether MAC requires PHYLIB - missing CONFIG_PHYLIB"
@@ -184,6 +187,10 @@ static int dw_write_hwaddr(struct eth_device *dev)
 	writel(macid_hi, &mac_p->macaddr0hi);
 	writel(macid_lo, &mac_p->macaddr0lo);
 
+#ifdef CONFIG_BANANAPI
+    gmac_set_macaddr(dev);//set the mac addr according to the chipID
+#endif
+
 	return 0;
 }
 
@@ -223,6 +230,9 @@ static void dw_eth_halt(struct eth_device *dev)
 	writel(readl(&dma_p->opmode) & ~(RXSTART | TXSTART), &dma_p->opmode);
 
 	phy_shutdown(priv->phydev);
+#ifdef CONFIG_BANANAPI
+    //gmac_phy_power_disable(priv); //disable the power of phy
+#endif
 }
 
 static int dw_eth_init(struct eth_device *dev, bd_t *bis)
@@ -389,6 +399,9 @@ static int dw_phy_init(struct eth_device *dev)
 	struct dw_eth_dev *priv = dev->priv;
 	struct phy_device *phydev;
 	int mask = 0xffffffff;
+#ifdef CONFIG_BANANAPI
+    gmac_phy_power_en(priv);//enable the phy power;
+#endif
 
 #ifdef CONFIG_PHY_ADDR
 	mask = 1 << CONFIG_PHY_ADDR;
@@ -446,6 +459,9 @@ int designware_initialize(ulong base_addr, u32 interface)
 	dev->recv = dw_eth_recv;
 	dev->halt = dw_eth_halt;
 	dev->write_hwaddr = dw_write_hwaddr;
+#ifdef CONFIG_BANANAPI
+    priv->gpio_power_hd = sunxi_name_to_gpio("PH23");  //get the gpio power pin of PHY 
+#endif
 
 	eth_register(dev);
 
@@ -456,3 +472,49 @@ int designware_initialize(ulong base_addr, u32 interface)
 
 	return dw_phy_init(dev);
 }
+
+#ifdef CONFIG_BANANAPI
+void gmac_phy_power_en(struct dw_eth_dev *priv)
+{
+    if(!priv) return;
+
+    if (priv->gpio_power_hd){
+        gpio_direction_output(priv->gpio_power_hd, 1); //power on the PHY
+	    mdelay(200);
+    }
+
+    return;
+}
+
+void gmac_phy_power_disable(struct dw_eth_dev *priv)
+{
+    if(!priv) return;
+
+    if (priv->gpio_power_hd){
+        gpio_set_value(priv->gpio_power_hd,0);//power off the PHY
+    }
+
+    return;
+
+}
+
+void gmac_set_macaddr(struct eth_device *dev)
+{
+    struct dw_eth_dev *priv = dev->priv;
+    if(!dev) return;
+
+    if (priv->gpio_power_hd){
+        //we will set the mac address here
+        unsigned int reg_val;
+        reg_val = readl(0xf1c23800);//read the chipID
+        dev->enetaddr[0] = 0x02; /* Non OUI / registered MAC address */
+        dev->enetaddr[1] = (reg_val >>  0) & 0xff;
+        reg_val = readl(0xf1c2380c);
+        dev->enetaddr[2] = (reg_val >> 24) & 0xff;
+        dev->enetaddr[3] = (reg_val >> 16) & 0xff;
+        dev->enetaddr[4] = (reg_val >>  8) & 0xff;
+        dev->enetaddr[5] = (reg_val >>  0) & 0xff;
+    }
+
+}
+#endif
