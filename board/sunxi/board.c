@@ -154,7 +154,7 @@ void sunxi_board_init(void)
 #endif
 #ifdef CONFIG_AXP209_POWER
 	power_failed |= axp209_init();
-	power_failed |= axp209_set_dcdc2(1400);
+	power_failed |= axp209_set_dcdc2(1450);
 #ifdef CONFIG_FAST_MBUS
 	power_failed |= axp209_set_dcdc3(1300);
 #else
